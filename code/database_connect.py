@@ -19,7 +19,7 @@ cnx = mysql.connector.connect(user=user, password=password, host=host, database=
 cursor = cnx.cursor()
 
 def get_forum_id():
-    anime_name = input("enter an anime name \n")
+    anime_name = input("Enter an anime name \n")
     anime_response = requests.get(f"https://api.myanimelist.net/v2/anime?q={anime_name}&limit=10", headers=headers)
     anime_data = anime_response.json()
 
@@ -51,7 +51,7 @@ def get_forum_id():
     genres = ', '.join([genre['name'] for genre in anime['genres']])
     score = anime['mean']
 
-    query = "INSERT INTO anime (anime_id, name, year_of_release, genre, score) VALUES (%s, %s, %s, %s, %s)"
+    query = "INSERT INTO anime (anime_id, name, year_of_release, genre, score) VALUES (%s, %s, %s, %s, %s) ON DUPLICATE KEY UPDATE score=VALUES(score)"
     values = (anime_id, title, airing_date, genres, score)
     cursor.execute(query, values)
     cnx.commit()
