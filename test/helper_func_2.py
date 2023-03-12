@@ -5,7 +5,8 @@ with open('token.json', 'r') as f:
     auth_data = json.load(open('token.json', 'r'))
 
 headers = {
-    'Authorization': 'Bearer ' + auth_data['access_token'] }
+    'Authorization': 'Bearer ' + auth_data['access_token']
+}
 
 def get_anime_data(name):
     response = requests.get(f"https://api.myanimelist.net/v2/anime?q={name}&limit=10", headers=headers)

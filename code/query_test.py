@@ -28,7 +28,7 @@ def get_forum_id(anime_name):
     print(forum_data)
 
 
-get_forum_id("bleach")
+get_forum_id()
 def database():
     conn = sqlite3.connect('forum_posts.db')
     c = conn.cursor()
