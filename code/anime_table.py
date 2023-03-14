@@ -4,6 +4,10 @@ import json
 # database information in config.py
 import config
 from bs4 import BeautifulSoup
+import pandas as pd
+from text_process import text_process
+import re
+import html
 
 with open('token.json', 'r') as f:
     auth_data = json.load(open('token.json', 'r'))
@@ -15,6 +19,7 @@ headers = {
 # Connect to the database -> the information is on the config.py file
 cnx = mysql.connector.connect(user=config.user, password=config.password, host=config.host, database=config.database)
 cursor = cnx.cursor()
+
 
 # getting anime_id and get information using api call
 def get_anime_id():
@@ -66,7 +71,7 @@ def get_anime_id():
     return anime_id 
 
 #function to get the forum_ids from the data we got from get_anime_id
-def get_forum_ids(anime_id):
+def get_forum_ids_scraper(anime_id):
     all_t_id = []
     shows = 0
     page_num = 1
@@ -90,10 +95,10 @@ def get_forum_ids(anime_id):
     return all_t_id
 
 
-
+#function to get data for forum_ids table 
 def get_forum_id():
     anime_id = get_anime_id()
-    forum_ids = get_forum_ids(anime_id)
+    forum_ids = get_forum_ids_scraper(anime_id)
     for ids in forum_ids: 
         url = f"https://api.myanimelist.net/v2/forum/topic/{ids}"
         response = requests.get(url, headers=headers)
@@ -105,9 +110,49 @@ def get_forum_id():
         cursor.execute(query, values)
         cnx.commit()
 
-get_forum_id()
+def get_comments():
+    limit = 100
+    forum_ids = get_forum_ids_scraper(get_anime_id())
+    comments = {'forum_id': [], 'comment_id': [], 'message': [], 'cleaned_message': []}
 
+    for forum_id in forum_ids:
+        offset = 0
+        while True:
+            response = requests.get(f"https://api.myanimelist.net/v2/forum/topic/{forum_id}?limit={limit}&offset={offset}", headers=headers)
+            forum_data = response.json()
+            posts = forum_data['data']['posts']
+            if not posts:
+                break
+            comment_ids = [post['id'] for post in posts]
+            bodies = [html.unescape(re.sub(r'\[yt\].*?\[/yt\]|\[img\].*?\[/img\]|\[.*?\]|\t|\n|\r|\xa0|<[^<]+?>', '', post['body'])) for post in posts]
+            cleaned_messages = [text_process(body) for body in bodies]
+            comments['forum_id'].extend([forum_id] * len(posts))
+            comments['comment_id'].extend(comment_ids)
+            comments['message'].extend(bodies)
+            comments['cleaned_message'].extend(cleaned_messages)
+            if len(posts) < limit:
+                break
+            offset += limit
+
+    df = pd.DataFrame(comments)
+    print(df.head())
+    df.to_csv('cleaned_forum_data.csv', index=False)
+    for index, row, in df.iterrows():
+        original_text = row['message'].replace("'", "''")
+        cleaned_text = row['cleaned_message'].replace("'", "''")
+        insert_query = f"""
+        INSERT INTO comments (comment_id, forum_id, original_text, cleaned_text)
+        VALUES ({row['comment_id']}, {row['forum_id']}, '{original_text}', '{cleaned_text}')
+        """
+        cursor.execute(insert_query)
+
+    # make query to select from comments and do analysis 
+    query = """SELECT cleaned_text FROM comments"""
+
+    cnx.commit()
+
+get_comments()
+    
 # Close the cursor and connection
 cursor.close()
 cnx.close()
-
