@@ -8,6 +8,7 @@ import pandas as pd
 from text_process import text_process
 import re
 import html
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
 
 with open('token.json', 'r') as f:
     auth_data = json.load(open('token.json', 'r'))
@@ -48,7 +49,6 @@ def get_anime_id():
         print("Error: No anime found. ")
 
     response = requests.get(f"https://api.myanimelist.net/v2/anime/{anime_id}?fields=id,title,start_date,genres,mean", headers=headers)
-
     anime = response.json()
 
     #getting data using the json data (tags)
@@ -113,7 +113,7 @@ def get_forum_id():
 def get_comments():
     limit = 100
     forum_ids = get_forum_ids_scraper(get_anime_id())
-    comments = {'forum_id': [], 'comment_id': [], 'message': [], 'cleaned_message': []}
+    comments = {'forum_id': [], 'comment_id': [], 'message': [], 'cleaned_message': [], 'sentiment_score': []}
 
     for forum_id in forum_ids:
         offset = 0
@@ -126,10 +126,13 @@ def get_comments():
             comment_ids = [post['id'] for post in posts]
             bodies = [html.unescape(re.sub(r'\[yt\].*?\[/yt\]|\[img\].*?\[/img\]|\[.*?\]|\t|\n|\r|\xa0|<[^<]+?>', '', post['body'])) for post in posts]
             cleaned_messages = [text_process(body) for body in bodies]
+            # Calculate sentiment score for each comment
+            sentiment_scores = [get_sentiment_score(text) for text in cleaned_messages]
             comments['forum_id'].extend([forum_id] * len(posts))
             comments['comment_id'].extend(comment_ids)
             comments['message'].extend(bodies)
-            comments['cleaned_message'].extend(cleaned_messages)
+            comments['cleaned_message'].extend(cleaned_messages)            
+            comments['sentiment_score'].extend(sentiment_scores)
             if len(posts) < limit:
                 break
             offset += limit
@@ -141,17 +144,37 @@ def get_comments():
         original_text = row['message'].replace("'", "''")
         cleaned_text = row['cleaned_message'].replace("'", "''")
         insert_query = f"""
-        INSERT INTO comments (comment_id, forum_id, original_text, cleaned_text)
-        VALUES ({row['comment_id']}, {row['forum_id']}, '{original_text}', '{cleaned_text}')
+        INSERT INTO comments (comment_id, forum_id, original_text, cleaned_text, sentiment_score)
+         VALUES ({row['comment_id']}, {row['forum_id']}, '{original_text}', '{cleaned_text}', {row['sentiment_score']}) ON DUPLICATE KEY UPDATE sentiment_score=VALUES(sentiment_score)
         """
         cursor.execute(insert_query)
 
     # make query to select from comments and do analysis 
-    query = """SELECT cleaned_text FROM comments"""
-
+    query = """SELECT cleaned_text, sentiment_score FROM comments"""
     cnx.commit()
 
-get_comments()
+# Retrieve the data from the clean_message column in the comments table
+
+def get_sentiment_score(text):
+    query = """SELECT cleaned_text FROM comments"""
+    cursor.execute(query)
+    results = cursor.fetchall()
+
+    # Convert the results to a Pandas DataFrame
+    df = pd.DataFrame(results, columns=['cleaned_message'])
+
+    # Define the get_sentiment_score function
+    sia = SentimentIntensityAnalyzer()
+    return sia.polarity_scores(str(text))['compound']
+
+
+def main():
+    get_forum_id()
+    get_comments()
+    # any other functions to execute
+
+if __name__ == '__main__':
+    main()
     
 # Close the cursor and connection
 cursor.close()
