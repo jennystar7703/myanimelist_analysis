@@ -21,27 +21,26 @@ headers = {
 cnx = mysql.connector.connect(user=config.user, password=config.password, host=config.host, database=config.database)
 cursor = cnx.cursor()
 
+# asks for user input, an anime they want to search
+anime_name = input("Enter an anime name \n")
+anime_response = requests.get(f"https://api.myanimelist.net/v2/anime?q={anime_name}&limit=10", headers=headers)
+anime_data = anime_response.json()
+
+anime_names = [anime_data['data'][anime]['node']['title'] for anime in range(len(anime_data['data']))]
+for i, anime_name in enumerate(anime_names):   
+    print(f"{i+1}. {anime_name}")
+
+# asking user input to type an anime and selecting the anime they specify (shows 10 results)
+get_id = int(input("Please select specific Anime by it's number on the left: "))
+
+if get_id in range(1, 11):
+    selected_anime = anime_names[get_id - 1]
+    print(f"Selected {selected_anime}")
+else:
+    print("Enter a number.")
 
 # getting anime_id and get information using api call
-def get_anime_id():
-    anime_name = input("Enter an anime name \n")
-    #using get request to get a json response
-    anime_response = requests.get(f"https://api.myanimelist.net/v2/anime?q={anime_name}&limit=10", headers=headers)
-    anime_data = anime_response.json()
-
-    anime_names = [anime_data['data'][anime]['node']['title'] for anime in range(len(anime_data['data']))]
-    for i, anime_name in enumerate(anime_names):   
-        print(f"{i+1}. {anime_name}")
-    
-    # asking user input to type an anime and selecting the anime they specify (shows 10 results)
-    get_id = int(input("Please select specific Anime by it's number on the left: "))
-
-    if get_id in range(1, 11):
-        selected_anime = anime_names[get_id - 1]
-        print(f"Selected {selected_anime}")
-    else:
-        print("Enter a number.")
-    
+def get_anime_id():    
     #using json beautifier to get the data from the response 
     anime_id = anime_data['data'][get_id - 1]['node']['id'] 
 
@@ -89,6 +88,7 @@ def get_forum_ids_scraper(anime_id):
         t_id = [row['data-topic-id'] for row in rows]
         print(f"Forum IDs for page {page_num}: {t_id}")
         all_t_id.extend(t_id)
+        # because it shows 50 forum topics per page 
         shows += 50
         page_num += 1
         
@@ -169,7 +169,6 @@ def get_sentiment_score(text):
 
 
 def main():
-    get_forum_id()
     get_comments()
     # any other functions to execute
 
