@@ -39,6 +39,7 @@ if get_id in range(1, 11):
 else:
     print("Enter a number.")
 
+
 # getting anime_id and get information using api call
 def get_anime_id():    
     #using json beautifier to get the data from the response 
@@ -92,23 +93,20 @@ def get_forum_ids_scraper(anime_id):
         shows += 50
         page_num += 1
         
-    return all_t_id
-
-
-#function to get data for forum_ids table 
-def get_forum_id():
-    anime_id = get_anime_id()
-    forum_ids = get_forum_ids_scraper(anime_id)
-    for ids in forum_ids: 
+    # putting all the forum_ids info in the database
+    for ids in all_t_id: 
         url = f"https://api.myanimelist.net/v2/forum/topic/{ids}"
         response = requests.get(url, headers=headers)
         forum_titles = response.json()
         forum_title = forum_titles['data']['title']
         
-        query = "INSERT INTO forum_ids (forum_id, anime_id, forum_title) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE forum_title=VALUES(forum_title)"
+        query = "INSERT IGNORE INTO forum_ids (forum_id, anime_id, forum_title) VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE forum_title=VALUES(forum_title)"
         values = (ids, anime_id, forum_title)
         cursor.execute(query, values)
         cnx.commit()
+
+    return all_t_id
+
 
 def get_comments():
     limit = 100
@@ -144,7 +142,7 @@ def get_comments():
         original_text = row['message'].replace("'", "''")
         cleaned_text = row['cleaned_message'].replace("'", "''")
         insert_query = f"""
-        INSERT INTO comments (comment_id, forum_id, original_text, cleaned_text, sentiment_score)
+        INSERT IGNORE INTO comments (comment_id, forum_id, original_text, cleaned_text, sentiment_score)
          VALUES ({row['comment_id']}, {row['forum_id']}, '{original_text}', '{cleaned_text}', {row['sentiment_score']}) ON DUPLICATE KEY UPDATE sentiment_score=VALUES(sentiment_score)
         """
         cursor.execute(insert_query)
@@ -170,6 +168,7 @@ def get_sentiment_score(text):
 
 def main():
     get_comments()
+
     # any other functions to execute
 
 
