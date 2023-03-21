@@ -32,7 +32,7 @@ def generate_new_token(authorisation_code: str, code_verifier: str) -> dict:
         'client_id': CLIENT_ID,
         'code': authorisation_code,
         'code_verifier': code_verifier,
-        'grant_type': 'authorization_code'
+        'grant_type': 'authorization_code' #edit
     }
 
     response = requests.post(url, data)
